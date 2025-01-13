@@ -3,7 +3,7 @@ project:
   title:        "GDS project"      # Project title
   author:       "Mani Rani"      # Your name
   discord:      ""      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
-  description:  "fifo"      # One line description of what your project does
+  description:  "project"      # One line description of what your project does
   language:     "Verilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
   clock_hz:     1000       # Clock frequency in Hz (or 0 if not applicable)
 
