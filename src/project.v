@@ -1,137 +1,84 @@
 /*
- * Copyright (c) 2024 Your Name
+ * Copyright (c) 2024 Mani Rani
  * SPDX-License-Identifier: Apache-2.0
  */
 
 `default_nettype none
 
-module tt_um_example (
-    input  wire [15:0] ui_in,    // Dedicated inputs
-    output wire [15:0] uo_out,   // Dedicated outputs
-    input  wire [15:0] uio_in,   // IOs: Input path
-    output wire [15:0] uio_out,  // IOs: Output path
-    output wire [15:0] uio_oe,   // IOs: Enable path (active high: 0=input, 1=output)
+module tt_um_fifo (
+    input  wire [7:0] ui_in,    // Dedicated inputs
+    output wire [7:0] uo_out,   // Dedicated outputs
+    input  wire [7:0] uio_in,   // IOs: Input path
+    output wire [7:0] uio_out,  // IOs: Output path
+    output wire [7:0] uio_oe,   // IOs: Enable path (active high: 0=input, 1=output)
     input  wire       ena,      // always 1 when the design is powered, so you can ignore it
-    input  wire       wr_en,
-    input  wire       rd_en,
     input  wire       clk,      // clock
-    input  wire       rst_n,     // reset_n - low to reset
-    output wire       f_full,
-    output wire       f_empty,
-    output wire       f_almostfull,
-    output wire       f_almostempty,
-    output wire       f_underrun,
-    output wire       f_overrun
+    input  wire       rst_n     // reset_n - low to reset
 );
 
-  // All output pins must be assigned. If not used, assign to 0.
-  //assign uo_out  = ui_in + uio_in;  // Example: ou_out is the sum of ui_in and uio_in
-  assign uio_out = 0;
-  assign uio_oe  = 0;
+    // FIFO interface
+    wire write_enable = ui_in[0];  // Write enable (use LSB of ui_in)
+    wire read_enable  = ui_in[1];  // Read enable (use next bit of ui_in)
+    wire [7:0] data_in = ui_in;    // Data to be written into the FIFO
+    wire [7:0] data_out;           // Data read from the FIFO
 
-  // List all unused inputs to prevent warnings
-    wire _unused = &{ena, uio_in, 1'b0};
-    fifo f1(.clk(clk),.resetn(rst_n),.wr_enb(wr_en),.rd_enb(rd_en),.wr_data(ui_in),.rd_data(uo_out),.f_full(f_full),.f_empty(f_empty),.f_almostfull(f_almostfull),.f_almostempty(f_almostempty),.f_underrun(f_underrun),.f_overrun(f_overrun));
+    fifo #(
+        .DEPTH(256)               // FIFO depth (number of locations)
+    ) fifo_inst (
+        .clk(clk),
+        .rst(!rst_n),             // Reset (active high in the FIFO)
+        .write_enable(write_enable),
+        .read_enable(read_enable),
+        .data_in(data_in),
+        .data_out(data_out)
+    );
+
+    // Assign outputs
+    assign uo_out  = data_out;   // Drive output with FIFO read data
+    assign uio_out = 8'b0;       // Unused in this example
+    assign uio_oe  = 8'b0;       // All IOs in input mode (not used)
+
+    // Prevent warnings for unused inputs
+    wire _unused = &{uio_in, 1'b0};
+
 endmodule
 
+module fifo #(
+    parameter DEPTH = 256       // FIFO depth
+) (
+    input wire        clk,
+    input wire        rst,
+    input wire        write_enable,
+    input wire        read_enable,
+    input wire [7:0]  data_in,
+    output reg [7:0]  data_out
+);
 
-//8*16 FIFO module
-module fifo(clk,resetn,wr_enb,rd_enb,wr_data,rd_data,f_full,f_empty,f_almostfull,f_almostempty,f_underrun,f_overrun);
-  input              clk;
-  input              resetn;
-  input              wr_enb;
-  input              rd_enb;
-  input      [15:0]  wr_data;
-  output reg [15:0]  rd_data;
-  output             f_full;
-  output             f_empty;
-  output             f_almostfull;
-  output             f_almostempty;
-  output             f_underrun;
-  output             f_overrun;
- 
-  //FIFO size declaration
-  reg [15:0]fif[0:7];
- 
-  //intermediate signal
-  reg        [3:0]   occupancy;
-  reg        [2:0]   wr_pntr;
-  reg        [2:0]   rd_pntr;
-  wire               eff_write;
-  wire               eff_read;
- 
- //flag status signal
-  assign f_full=((occupancy==4'd8)?1'b1:1'b0);
-  assign f_empty=((occupancy==4'd0)?1'b1:1'b0);
-  assign f_almostfull=((occupancy==4'd6)?1'b1:1'b0);
-  assign f_almostempty=((occupancy==4'd2)?1'b1:1'b0);
-  assign f_underrun=(((rd_enb==1'b1)&&(f_empty==1'b1))?1'b1:1'b0);
-  assign f_overrun=(((wr_enb==1'b1)&&(f_full==1'b1))?1'b1:1'b0);
- 
- //effective write & read
-  assign eff_write=((wr_enb==1'b1)&&(f_full==1'b0))?1'b1:1'b0;
-  assign eff_read=((rd_enb==1'b1)&&(f_empty==1'b0))?1'b1:1'b0;
- 
- //occupancy
-  always@(posedge clk or negedge resetn)
-    begin
-      if(!resetn)
-        occupancy<=4'b0;
-      else
-        begin
-          case({eff_write,eff_read})
-            2'b00:occupancy<=occupancy;
-            2'b01:occupancy<=occupancy-1'b1;
-            2'b10:occupancy<=occupancy+1'b1;
-            2'b11:occupancy<=occupancy;
-          endcase
+    reg [7:0] mem [0:DEPTH-1];   // Memory buffer
+    reg [$clog2(DEPTH)-1:0] write_ptr; // Write pointer
+    reg [$clog2(DEPTH)-1:0] read_ptr;  // Read pointer
+    reg [$clog2(DEPTH):0] fifo_count;  // Number of elements in FIFO
+
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
+            // Reset all pointers and counters
+            write_ptr <= 0;
+            read_ptr <= 0;
+            fifo_count <= 0;
+        end else begin
+            // Write logic
+            if (write_enable && fifo_count < DEPTH) begin
+                mem[write_ptr] <= data_in;
+                write_ptr <= write_ptr + 1;
+                fifo_count <= fifo_count + 1;
+            end
+
+            // Read logic
+            if (read_enable && fifo_count > 0) begin
+                data_out <= mem[read_ptr];
+                read_ptr <= read_ptr + 1;
+                fifo_count <= fifo_count - 1;
+            end
         end
-    end
- 
-//updation of write pointer
-  always@(posedge clk or negedge resetn)
-    begin
-      if(!resetn)
-        wr_pntr<=3'b0;
-      else
-        begin
-          if(eff_write==1'b1)
-            wr_pntr<=wr_pntr+1;
-          else
-            wr_pntr<=wr_pntr;
-        end
-    end
- 
-//updation of read pointer
-  always@(posedge clk or negedge resetn)
-    begin
-      if(!resetn)
-        rd_pntr<=3'b0;
-      else
-        begin
-          if(eff_read==1'b1)
-            rd_pntr<=rd_pntr+1;
-          else
-            rd_pntr<=rd_pntr;
-        end
-    end
- 
-//write operation
- always@(posedge clk)
-    begin
-      if(eff_write==1'b1)
-        fif[wr_pntr]<=wr_data;
-    end
- 
-//read operation
- always@(posedge clk)
-    begin
-      if(eff_read==1'b1)
-        rd_data<=fif[rd_pntr];
     end
 endmodule
-
-
-
-
-
