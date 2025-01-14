@@ -17,18 +17,18 @@ module tb ();
   reg clk;
   reg rst_n;
   reg ena;
-  reg [15:0] ui_in;
-  reg [15:0] uio_in;
-  wire [15:0] uo_out;
-  wire [15:0] uio_out;
-  wire [15:0] uio_oe;
+   reg [7:0] ui_in;
+   reg [7:0] uio_in;
+   wire [7:0] uo_out;
+   wire [7:0] uio_out;
+   wire [7:0] uio_oe;
 `ifdef GL_TEST
   wire VPWR = 1'b1;
   wire VGND = 1'b0;
 `endif
 
   // Replace tt_um_example with your module name:
-  tt_um_example user_project (
+  tt_um_fifo user_project (
 
       // Include power ports for the Gate Level test:
 `ifdef GL_TEST
@@ -45,5 +45,27 @@ module tb ();
       .clk    (clk),      // clock
       .rst_n  (rst_n)     // not reset
   );
+   always
+      #5 clk=~clk;
+   initial
+      begin
+         rst_n=1;
+         ena=1;uio_in[0]=0;
+         @(posedge clk) rst_n=0;
+         ui_in=8;
+         @(posedge clk)
+         ui_in=5;
+          @(posedge clk)
+         ui_in=4;
+          @(posedge clk)
+         ui_in=3;
+          @(posedge clk)
+         ena=0;uio_in[0]=1;
+         repeat(5)
+            @(posedge clk);
+         #5
+      end
+      
+   
 
 endmodule
