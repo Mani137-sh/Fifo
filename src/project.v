@@ -15,37 +15,29 @@ module tt_um_fifo (
     input  wire       clk,      // clock
     input  wire       rst_n     // reset_n - low to reset
 );
+     // All output pins must be assigned. If not used, assign to 0.
+  //assign uo_out  = 0;  // Example: ou_out is the sum of ui_in and uio_in
+  assign uio_out = 0;
+  assign uio_oe  = 0;
 
-    // FIFO interface
-    wire write_enable = ui_in[0];  // Write enable (use LSB of ui_in)
-    wire read_enable  = ui_in[1];  // Read enable (use next bit of ui_in)
-    wire [7:0] data_in = ui_in;    // Data to be written into the FIFO
-    wire [7:0] data_out;           // Data read from the FIFO
+  // List all unused inputs to prevent warnings
+    wire _unused = &{uio_in[7:1], 1'b0};
 
-    fifo #(
-        .DEPTH(256)               // FIFO depth (number of locations)
-    ) fifo_inst (
+ 
+    fifo fifo_inst (
         .clk(clk),
         .rst(!rst_n),             // Reset (active high in the FIFO)
-        .write_enable(write_enable),
-        .read_enable(read_enable),
-        .data_in(data_in),
-        .data_out(data_out)
+        .write_enable(ena),
+        .read_enable(uio_in[0]),
+        .data_in(ui_in),
+        .data_out(uo_out)
     );
 
-    // Assign outputs
-    assign uo_out  = data_out;   // Drive output with FIFO read data
-    assign uio_out = 8'b0;       // Unused in this example
-    assign uio_oe  = 8'b0;       // All IOs in input mode (not used)
-
-    // Prevent warnings for unused inputs
-    wire _unused = &{uio_in, 1'b0};
+  
 
 endmodule
 
-module fifo #(
-    parameter DEPTH = 256       // FIFO depth
-) (
+module fifo  (
     input wire        clk,
     input wire        rst,
     input wire        write_enable,
@@ -54,10 +46,10 @@ module fifo #(
     output reg [7:0]  data_out
 );
 
-    reg [7:0] mem [0:DEPTH-1];   // Memory buffer
-    reg [$clog2(DEPTH)-1:0] write_ptr; // Write pointer
-    reg [$clog2(DEPTH)-1:0] read_ptr;  // Read pointer
-    reg [$clog2(DEPTH):0] fifo_count;  // Number of elements in FIFO
+    reg [7:0] mem [0:3];   // Memory buffer
+    reg [1:0] write_ptr; // Write pointer
+    reg [1:0] read_ptr;  // Read pointer
+    reg [2:0] fifo_count;  // Number of elements in FIFO
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -67,7 +59,7 @@ module fifo #(
             fifo_count <= 0;
         end else begin
             // Write logic
-            if (write_enable && fifo_count < DEPTH) begin
+            if (write_enable && fifo_count < 4) begin
                 mem[write_ptr] <= data_in;
                 write_ptr <= write_ptr + 1;
                 fifo_count <= fifo_count + 1;
