@@ -46,7 +46,7 @@ module tb ();
       .rst_n  (rst_n)     // not reset
   );
    always
-      #5 clk=~clk;
+      #10 clk=~clk;
    initial
       begin
          rst_n=1;
