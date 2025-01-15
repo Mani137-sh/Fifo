@@ -52,17 +52,8 @@ module tb ();
          rst_n=1;
          ena=1;uio_in[0]=0;
          @(posedge clk) rst_n=0;
-         ui_in=8;
-         @(posedge clk)
-         ui_in=5;
-          @(posedge clk)
-         ui_in=4;
-          @(posedge clk)
-         ui_in=3;
           @(posedge clk)
          ena=0;uio_in[0]=1;
-         repeat(5)
-            @(posedge clk);
          #5
       end
       
