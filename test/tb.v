@@ -54,7 +54,7 @@ module tb ();
          @(posedge clk) rst_n=0;
           @(posedge clk)
          ena=0;uio_in[0]=1;
-         #5
+         #5;
       end
       
    
