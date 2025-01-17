@@ -26,7 +26,7 @@ module tt_um_fifo (
  
     fifo fifo_inst (
         .clk(clk),
-        .rst(!rst_n),             // Reset (active high in the FIFO)
+        .rst(rst_n),             // Reset (active high in the FIFO)
         .write_enable(ena),
         .read_enable(uio_in[0]),
         .data_in(ui_in),
